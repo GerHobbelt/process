@@ -33,14 +33,14 @@ struct async_in_buffer : ::boost::process::detail::windows::handler_base_ext,
 {
     Buffer & buf;
 
-    std::shared_ptr<std::promise<void>> promise;
+    std::shared_ptr<std::promise<void>> promise_;
     async_in_buffer operator>(std::future<void> & fut)
     {
-        promise = std::make_shared<std::promise<void>>();
-        fut = promise->get_future(); return std::move(*this);
+        promise_ = std::make_shared<std::promise<void>>();
+        fut = promise_->get_future(); return std::move(*this);
     }
 
-    std::shared_ptr<boost::process::async_pipe> pipe;
+    std::shared_ptr<boost::process::async_pipe> pipe_;
 
     async_in_buffer(Buffer & buf) : buf(buf)
     {
@@ -48,11 +48,11 @@ struct async_in_buffer : ::boost::process::detail::windows::handler_base_ext,
     template <typename Executor>
     inline void on_success(Executor&)
     {
-        auto pipe = this->pipe;
+        auto pipe = this->pipe_;
 
-        if (this->promise)
+        if (this->promise_)
         {
-            auto promise = this->promise;
+            auto promise = this->promise_;
 
             boost::asio::async_write(*pipe, buf,
                 [promise](const boost::system::error_code & ec, std::size_t)
@@ -72,22 +72,22 @@ struct async_in_buffer : ::boost::process::detail::windows::handler_base_ext,
         std::move(*pipe).source().close();
 
 
-        this->pipe = nullptr;
+        this->pipe_ = nullptr;
     }
 
     template<typename Executor>
     void on_error(Executor &, const std::error_code &) const
     {
-        ::boost::winapi::CloseHandle(pipe->native_source());
+        ::boost::winapi::CloseHandle(pipe_->native_source());
     }
 
     template <typename WindowsExecutor>
     void on_setup(WindowsExecutor &exec)
     {
-        if (!pipe)
-            pipe = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
+        if (!pipe_)
+            pipe_ = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
 
-        ::boost::winapi::HANDLE_ source_handle = std::move(*pipe).source().native_handle();
+        ::boost::winapi::HANDLE_ source_handle = std::move(*pipe_).source().native_handle();
 
         boost::winapi::SetHandleInformation(source_handle,
                 boost::winapi::HANDLE_FLAG_INHERIT_,

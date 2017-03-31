@@ -75,12 +75,14 @@ struct overload_handler : ex::handler
     {
         st = "windows";
         const char* env = exec.env;
+		(void)env;
     }
     template <class Sequence>
     void on_setup(ex::posix_executor<Sequence>& exec) const
     {
         st = "posix";
         char** env = exec.env;
+		(void)env;
     }
 };
 

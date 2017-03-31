@@ -71,7 +71,7 @@ struct async_out_buffer : ::boost::process::detail::windows::handler_base_ext,
 {
     Buffer & buf;
 
-    std::shared_ptr<boost::process::async_pipe> pipe;
+    std::shared_ptr<boost::process::async_pipe> pipe_;
 
 
     async_out_buffer(Buffer & buf) : buf(buf)
@@ -80,26 +80,26 @@ struct async_out_buffer : ::boost::process::detail::windows::handler_base_ext,
     template <typename Executor>
     inline void on_success(Executor&)
     {
-        auto pipe = this->pipe;
+        auto pipe = this->pipe_;
         boost::asio::async_read(*pipe, buf,
                 [pipe](const boost::system::error_code&, std::size_t){});
         std::move(*pipe).sink().close();
-        this->pipe       = nullptr;
+        this->pipe_ = nullptr;
 
     }
 
     template<typename Executor>
     void on_error(Executor &, const std::error_code &) const
     {
-        std::move(*pipe).sink().close();
+        std::move(*pipe_).sink().close();
     }
 
     template <typename WindowsExecutor>
     void on_setup(WindowsExecutor &exec)
     {
-        if (!pipe)
-            pipe = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
-        apply_out_handles(exec, std::move(*pipe).sink().native_handle(),
+        if (!pipe_)
+            pipe_ = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
+        apply_out_handles(exec, std::move(*pipe_).sink().native_handle(),
                 std::integral_constant<int, p1>(), std::integral_constant<int, p2>());
     }
 };
@@ -110,21 +110,21 @@ template<int p1, int p2, typename Type>
 struct async_out_future : ::boost::process::detail::windows::handler_base_ext,
                           ::boost::process::detail::windows::require_io_context
 {
-    std::shared_ptr<boost::process::async_pipe> pipe;
-    std::shared_ptr<std::promise<Type>> promise = std::make_shared<std::promise<Type>>();
-    std::shared_ptr<boost::asio::streambuf> buffer = std::make_shared<boost::asio::streambuf>();
+    std::shared_ptr<boost::process::async_pipe> pipe_;
+    std::shared_ptr<std::promise<Type>> promise_ = std::make_shared<std::promise<Type>>();
+    std::shared_ptr<boost::asio::streambuf> buffer_ = std::make_shared<boost::asio::streambuf>();
 
 
     async_out_future(std::future<Type> & fut)
     {
-        fut = promise->get_future();
+        fut = promise_->get_future();
     }
     template <typename Executor>
     inline void on_success(Executor&)
     {
-        auto pipe    = this->pipe;
-        auto buffer  = this->buffer;
-        auto promise = this->promise;
+        auto pipe    = this->pipe_;
+        auto buffer  = this->buffer_;
+        auto promise = this->promise_;
         std::move(*pipe).sink().close();
         boost::asio::async_read(*pipe, *buffer,
                 [pipe, buffer, promise](const boost::system::error_code& ec, std::size_t)
@@ -149,9 +149,9 @@ struct async_out_future : ::boost::process::detail::windows::handler_base_ext,
 
                     }
                 });
-        this->pipe       = nullptr;
-        this->buffer  = nullptr;
-        this->promise = nullptr;
+        this->pipe_    = nullptr;
+        this->buffer_  = nullptr;
+        this->promise_ = nullptr;
 
 
     }
@@ -159,16 +159,16 @@ struct async_out_future : ::boost::process::detail::windows::handler_base_ext,
     template<typename Executor>
     void on_error(Executor &, const std::error_code &) const
     {
-        std::move(*pipe).sink().close();
+        std::move(*pipe_).sink().close();
     }
 
     template <typename WindowsExecutor>
     void on_setup(WindowsExecutor &exec)
     {
-        if (!pipe)
-            pipe = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
+        if (!pipe_)
+            pipe_ = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
 
-        apply_out_handles(exec, std::move(*pipe).sink().native_handle(),
+        apply_out_handles(exec, std::move(*pipe_).sink().native_handle(),
                 std::integral_constant<int, p1>(), std::integral_constant<int, p2>());
     }
 };

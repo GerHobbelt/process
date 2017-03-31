@@ -72,7 +72,7 @@ struct read_handler
 
     read_handler(boost::asio::streambuf &buffer) : buffer_(buffer) {}
 
-    void operator()(const boost::system::error_code &ec, std::size_t size)
+    void operator()(const boost::system::error_code &ec, std::size_t /* size */)
     {
         BOOST_REQUIRE(!ec);
         std::istream is(&buffer_);

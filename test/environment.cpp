@@ -169,8 +169,8 @@ BOOST_AUTO_TEST_CASE(clear_empty_my,  *boost::unit_test::timeout(5))
     BOOST_CHECK_EQUAL(env.at("BOOST_PROCESS_TEST_VAR_b").to_string(), "2");
     BOOST_CHECK_EQUAL(env.at("BOOST_PROCESS_TEST_VAR_c").to_string(), "3");
     BOOST_CHECK_EQUAL(env.size(), sz + 3u);
-    BOOST_CHECK_EQUAL(std::distance(env.begin(),  env.end()),  sz + 3);
-    BOOST_CHECK_EQUAL(std::distance(env.cbegin(), env.cend()), sz + 3);
+    BOOST_CHECK_EQUAL(static_cast<std::size_t>(std::distance(env.begin(),  env.end())),  sz + 3);
+    BOOST_CHECK_EQUAL(static_cast<std::size_t>(std::distance(env.cbegin(), env.cend())), sz + 3);
 
     env.erase("BOOST_PROCESS_TEST_VAR_a");
     BOOST_CHECK_EQUAL(env.size(), sz + 2u);
@@ -178,8 +178,8 @@ BOOST_AUTO_TEST_CASE(clear_empty_my,  *boost::unit_test::timeout(5))
     BOOST_CHECK_EQUAL(env.at   ("BOOST_PROCESS_TEST_VAR_b").to_string(), "2");
     BOOST_CHECK_EQUAL(env.at   ("BOOST_PROCESS_TEST_VAR_c").to_string(), "3");
 
-    BOOST_CHECK_EQUAL(std::distance(env.begin(),  env.end()),  sz + 2);
-    BOOST_CHECK_EQUAL(std::distance(env.cbegin(), env.cend()), sz + 2);
+    BOOST_CHECK_EQUAL(static_cast<std::size_t>(std::distance(env.begin(),  env.end())),  sz + 2);
+    BOOST_CHECK_EQUAL(static_cast<std::size_t>(std::distance(env.cbegin(), env.cend())), sz + 2);
 
     env.erase("BOOST_PROCESS_TEST_VAR_b");
     BOOST_CHECK_EQUAL(env.size(), sz + 1u);
@@ -187,15 +187,15 @@ BOOST_AUTO_TEST_CASE(clear_empty_my,  *boost::unit_test::timeout(5))
     BOOST_CHECK_EQUAL(env.count("BOOST_PROCESS_TEST_VAR_b"), 0u);
     BOOST_CHECK_EQUAL(env.at   ("BOOST_PROCESS_TEST_VAR_c").to_string(), "3");
 
-    BOOST_CHECK_EQUAL(std::distance(env.begin(),  env.end()),  sz + 1);
-    BOOST_CHECK_EQUAL(std::distance(env.cbegin(), env.cend()), sz + 1);
+    BOOST_CHECK_EQUAL(static_cast<std::size_t>(std::distance(env.begin(),  env.end())),  sz + 1);
+    BOOST_CHECK_EQUAL(static_cast<std::size_t>(std::distance(env.cbegin(), env.cend())), sz + 1);
 
     env.clear();
     //note: windows puts an entry without a name into the list, so it might not be empty after clear.
     BOOST_CHECK_LE(env.size(), sz);
 
-    BOOST_CHECK_LE(std::distance(env.begin(),  env.end()),  sz);
-    BOOST_CHECK_LE(std::distance(env.cbegin(), env.cend()), sz);
+    BOOST_CHECK_LE(static_cast<std::size_t>(std::distance(env.begin(),  env.end())),  sz);
+    BOOST_CHECK_LE(static_cast<std::size_t>(std::distance(env.cbegin(), env.cend())), sz);
 
     for (auto && ee : e)
         env.emplace(ee.get_name(), ee.to_string());

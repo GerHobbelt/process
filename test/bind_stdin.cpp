@@ -97,7 +97,7 @@ struct write_handler
 
     write_handler(bp::ipstream &is) : is_(is) {}
 
-    void operator()(const boost::system::error_code &ec, std::size_t size)
+    void operator()(const boost::system::error_code & /* ec */, std::size_t size)
     {
         BOOST_REQUIRE_EQUAL(6u, size);
         std::string s;

@@ -259,7 +259,7 @@ BOOST_AUTO_TEST_CASE(async_out_stream, *boost::unit_test::timeout(2))
 
     std::string line;
     std::getline(istr, line);
-    BOOST_REQUIRE_GE(line.size(), 3);
+    BOOST_REQUIRE_GE(line.size(), 3u);
     BOOST_CHECK(boost::algorithm::starts_with(line, "abc"));
     c.wait();
 }
@@ -323,7 +323,7 @@ BOOST_AUTO_TEST_CASE(async_error, *boost::unit_test::timeout(2))
         "doesn't exist",
         ec,
         io_context,
-        bp::on_exit([&](int exit, const std::error_code& ec_in)
+        bp::on_exit([&](int /* exit */, const std::error_code& /* ec_in */)
                 {
                     exit_called=true;
                 })

@@ -203,7 +203,8 @@ struct invoke_get_initializer<helper_vector<Args...>>
     template<typename Sequence>
     static result_type call(Sequence & seq)
     {
-        return result_type(boost::fusion::at_key<Args>(seq).get_initializer()...);;
+        return result_type(boost::fusion::at_key<Args>(seq).get_initializer()...);
+		(void)seq;
     }
 };
 

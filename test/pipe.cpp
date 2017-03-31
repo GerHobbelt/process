@@ -20,11 +20,11 @@ BOOST_AUTO_TEST_CASE(plain, *boost::unit_test::timeout(2))
     bp::pipe pipe;
 
     std::string in  = "test";
-    pipe.write(in.c_str(), in.size());
+    pipe.write(in.c_str(), static_cast<int>(in.size()));
 
     std::string out;
     out.resize(4);
-    pipe.read(&out.front(), out.size());
+    pipe.read(&out.front(), static_cast<int>(out.size()));
 
     BOOST_CHECK_EQUAL(out, in);
 }
@@ -39,12 +39,12 @@ BOOST_AUTO_TEST_CASE(named, *boost::unit_test::timeout(2))
 #endif
 
     std::string in  = "xyz";
-    pipe.write(in.c_str(), in.size());
+    pipe.write(in.c_str(), static_cast<int>(in.size()));
 
 
     std::string out;
     out.resize(3);
-    pipe.read(&out.front(), out.size());
+    pipe.read(&out.front(), static_cast<int>(out.size()));
 
 
     BOOST_CHECK_EQUAL(out, in);
@@ -55,12 +55,12 @@ BOOST_AUTO_TEST_CASE(copy_pipe, *boost::unit_test::timeout(2))
     bp::pipe pipe;
 
     std::string in  = "test";
-    pipe.write(in.c_str(), in.size());
+    pipe.write(in.c_str(), static_cast<int>(in.size()));
 
     std::string out;
     out.resize(4);
     auto p2 = pipe;
-    p2.read(&out.front(), out.size());
+    p2.read(&out.front(), static_cast<int>(out.size()));
 
     BOOST_CHECK_EQUAL(out, in);
 }
@@ -70,12 +70,12 @@ BOOST_AUTO_TEST_CASE(move_pipe, *boost::unit_test::timeout(2))
     bp::pipe pipe;
 
     std::string in  = "test";
-    pipe.write(in.c_str(), in.size());
+    pipe.write(in.c_str(), static_cast<int>(in.size()));
 
     std::string out;
     out.resize(4);
     auto p2 = std::move(pipe);
-    p2.read(&out.front(), out.size());
+    p2.read(&out.front(), static_cast<int>(out.size()));
 
     BOOST_CHECK_EQUAL(out, in);
 }

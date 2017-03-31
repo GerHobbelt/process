@@ -67,7 +67,7 @@ struct async_system_handler : ::boost::process::detail::api::async_handler
         ios.post(
                 [h, ec]() mutable
                 {
-                    h(boost::system::error_code(ec.value(), boost::system::system_category()), -1);
+                    h(boost::system::error_code(ec.value(), boost::system::system_category()), 0u-1u);
                 });
     }
 

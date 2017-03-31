@@ -15,7 +15,7 @@
 
 namespace bp = boost::process;
 
-int main(int argc, char* argv[])
+int main(int, char* [])
 {
     bool thrown = false;
     try {

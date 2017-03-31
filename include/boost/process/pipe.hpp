@@ -160,14 +160,14 @@ struct basic_pipebuf : std::basic_streambuf<CharT, Traits>
             if (this->pptr() == this->epptr())
             {
                 bool wr = this->_write_impl();
-                *this->pptr() = ch;
+                *this->pptr() = static_cast<char_type>(ch);
                 this->pbump(1);
                 if (wr)
                     return ch;
             }
             else
             {
-                *this->pptr() = ch;
+                *this->pptr() = static_cast<char_type>(ch);
                 this->pbump(1);
                 if (this->_write_impl())
                     return ch;
