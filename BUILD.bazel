@@ -1,0 +1,31 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "boost.process",
+    hdrs = glob([
+        "include/**/*.hpp",
+        "include/**/*.h",
+    ]),
+    includes = ["include"],
+    deps = [
+        "@boost.algorithm",
+        "@boost.asio",
+        "@boost.config",
+        "@boost.core",
+        "@boost.filesystem",
+        "@boost.fusion",
+        "@boost.io",
+        "@boost.iterator",
+        "@boost.move",
+        "@boost.optional",
+        "@boost.system",
+        "@boost.throw_exception",
+        "@boost.tokenizer",
+        "@boost.type_index",
+        "@boost.type_traits",
+        "@boost.utility",
+        "@boost.winapi",
+    ],
+)
