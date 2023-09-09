@@ -1,0 +1,14 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "spawn",
+    srcs = ["spawn.cpp"],
+    defines = select({
+        "@platforms//os:windows": ["WIN32_LEAN_AND_MEAN=1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@boost.test",
+        "@boost.process",
+    ],
+)

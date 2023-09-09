@@ -1,20 +1,58 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
-package(default_visibility = ["//visibility:public"])
+bool_flag(
+    name = "use_std_fs",
+    visibility = ["//visibility:public"],
+    build_setting_default = False,
+)
+config_setting(name = "use_std_fs_enabled", flag_values = {":use_std_fs": "true"})
+config_setting(name = "use_std_fs_disabled", flag_values = {":use_std_fs": "false"})
+
+_WINDOWS_HDRS = [
+    "include/boost/process/detail/windows/*.hpp",
+]
+
+_POSIX_HDRS = [
+    "include/boost/process/detail/posix/*.hpp",
+]
+
+cc_library(
+    name = "process_posix",
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    hdrs = glob(_POSIX_HDRS),
+)
+
+cc_library(
+    name = "process_windows",
+    target_compatible_with = ["@platforms//os:windows"],
+    hdrs = glob(_WINDOWS_HDRS),
+    linkopts = ["-DEFAULTLIB:shell32"],
+)
 
 cc_library(
     name = "boost.process",
-    hdrs = glob([
-        "include/**/*.hpp",
-        "include/**/*.h",
-    ]),
+    visibility = ["//visibility:public"],
+    defines = select({
+        ":use_std_fs_enabled": ["BOOST_PROCESS_USE_STD_FS"],
+        ":use_std_fs_disabled": [],
+    }),
+    hdrs = glob(
+        [
+            "include/**/*.hpp",
+            "include/**/*.h",
+        ],
+        exclude = _POSIX_HDRS + _WINDOWS_HDRS,
+    ),
     includes = ["include"],
     deps = [
         "@boost.algorithm",
         "@boost.asio",
         "@boost.config",
         "@boost.core",
-        "@boost.filesystem",
         "@boost.fusion",
         "@boost.io",
         "@boost.iterator",
@@ -26,6 +64,16 @@ cc_library(
         "@boost.type_index",
         "@boost.type_traits",
         "@boost.utility",
-        "@boost.winapi",
-    ],
+    ] + select({
+        "@platforms//os:windows": [
+            ":process_windows",
+            "@boost.winapi",
+        ],
+        "//conditions:default": [
+            ":process_posix",
+        ],
+    }) + select({
+        ":use_std_fs_disabled": ["@boost.filesystem"],
+        ":use_std_fs_enabled": [],
+    }),
 )

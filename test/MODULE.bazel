@@ -1,0 +1,11 @@
+module(name = "boost.process.test")
+
+bazel_dep(name = "rules_cc", version = "0.0.8")
+bazel_dep(name = "platforms", version = "0.0.7")
+bazel_dep(name = "boost.test", version = "1.83.0.bzl.2")
+bazel_dep(name = "boost.process")
+
+local_path_override(
+    module_name = "boost.process",
+    path = "..",
+)
