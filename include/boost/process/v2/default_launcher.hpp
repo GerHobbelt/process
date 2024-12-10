@@ -26,6 +26,23 @@
 
 BOOST_PROCESS_V2_BEGIN_NAMESPACE
 
+#if defined(GENERATING_DOCUMENTATION)
+
+/// The default launcher for processes.
+/** This launcher will be used by process if a 
+ * process is launched through the constructor:
+ * 
+ * @code {.cpp}
+ * process proc("test", {});
+ * // equivalent to
+ * process prod = default_launcher()("test", {});
+ * @endcode
+ * 
+ */
+
+typedef implementation_defined default_process_launcher;
+
+#else
 #if defined(BOOST_PROCESS_V2_WINDOWS)
 typedef windows::default_launcher default_process_launcher;
 #else
@@ -34,6 +51,9 @@ typedef posix::pdfork_launcher default_process_launcher;
 #else
 typedef posix::default_launcher default_process_launcher;
 #endif
+#endif
+
+
 #endif
 
 

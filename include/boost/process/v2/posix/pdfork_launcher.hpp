@@ -15,9 +15,10 @@ BOOST_PROCESS_V2_BEGIN_NAMESPACE
 namespace posix
 {
 
-/// The default launcher for processes on windows.
+/// A launcher using `pdfork`. Default on FreeBSD
 struct pdfork_launcher : default_launcher
 {
+    /// The file descriptor of the subprocess. Set after fork.
     int fd;
     pdfork_launcher() = default;
 
@@ -118,6 +119,11 @@ struct pdfork_launcher : default_launcher
 
                 ec = detail::on_exec_setup(*this, executable, argv, inits...);
                 if (!ec)
+                {
+                    fd_whitelist.push_back(pg.p[1]);
+                    close_all_fds(ec);
+                }                
+                if (!ec)
                     ::execve(executable.c_str(), const_cast<char * const *>(argv), const_cast<char * const *>(env));
 
                 ::write(pg.p[1], &errno, sizeof(int));
@@ -149,7 +155,7 @@ struct pdfork_launcher : default_launcher
                 return basic_process<Executor>{exec};
             }
         }
-        basic_process<Executor> proc{exec, pid, fd};
+        basic_process<Executor> proc(exec, pid, fd);
         detail::on_success(*this, executable, argv, ec, inits...);
         return proc;
     }

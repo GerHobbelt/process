@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
+#include <thread>
 #include <boost/process/v2/environment.hpp>
+
+extern char **environ;
 
 #if defined(BOOST_PROCESS_V2_WINDOWS)
 #include <windows.h>
@@ -14,6 +17,12 @@ int main(int argc, char * argv[])
     std::string mode = argv[1];
     if (mode == "exit-code")
         return std::stoi(argv[2]);
+    else if (mode == "sleep")
+    {
+        const auto delay = std::chrono::milliseconds(std::stoi(argv[2]));
+        std::this_thread::sleep_for(delay);
+        return 0;
+    }
     else if (mode == "print-args")
         for (auto i = 0; i < argc; i++)
         {
@@ -35,6 +44,7 @@ int main(int argc, char * argv[])
         char buf[65535];
         printf(::getcwd(buf, sizeof(buf)));
 #endif
+        return 0;
     }
     else if (mode == "check-eof")
     {
@@ -45,7 +55,15 @@ int main(int argc, char * argv[])
     else if (mode == "print-env")
     {
         auto p = ::getenv(argv[2]);
-        assert(printf("%s", p) > 0);
+        if (p && *p)
+            assert(printf("%s", p) > 0);
+        else
+        {
+            printf("Can't find %s in environment\n", argv[2]);
+            for (auto e = environ; e != nullptr; e++)
+                printf("    %s\n", *e);
+            return 1;
+        }
     }
 #if defined(BOOST_PROCESS_V2_WINDOWS)
     else if (mode == "showwindow")

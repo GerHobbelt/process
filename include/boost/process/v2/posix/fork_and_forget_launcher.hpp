@@ -12,7 +12,7 @@ BOOST_PROCESS_V2_BEGIN_NAMESPACE
 namespace posix
 {
 
-/// The default launcher for processes on windows.
+/// A posix fork launcher that ignores errors after `fork`.
 struct fork_and_forget_launcher : default_launcher
 {
     fork_and_forget_launcher() = default;
@@ -102,6 +102,8 @@ struct fork_and_forget_launcher : default_launcher
 
                 ec = detail::on_exec_setup(*this, executable, argv, inits...);
                 if (!ec)
+                    close_all_fds(ec);
+                if (!ec)
                     ::execve(executable.c_str(), const_cast<char * const *>(argv), const_cast<char * const *>(env));
 
                 ec.assign(errno, system_category());
@@ -116,7 +118,7 @@ struct fork_and_forget_launcher : default_launcher
                 return basic_process<Executor>{exec};
             }
         }
-        basic_process<Executor> proc{exec, pid};
+        basic_process<Executor> proc(exec, pid);
         detail::on_success(*this, executable, argv, ec, inits...);
         return proc;
 

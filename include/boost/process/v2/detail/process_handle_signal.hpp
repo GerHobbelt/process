@@ -19,7 +19,7 @@
 #include <asio/any_io_executor.hpp>
 #include <asio/compose.hpp>
 #include <asio/post.hpp>
-#include <asio/windows/signal_set.hpp>
+#include <asio/signal_set.hpp>
 #else
 #include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/compose.hpp>
@@ -60,7 +60,7 @@ struct basic_process_handle_signal
                          typename std::enable_if<
                                  std::is_convertible<ExecutionContext &,
                                          BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context &>::value
-                         >::type = 0)
+                         >::type * = nullptr)
             : pid_(-1), signal_set_(context, SIGCHLD)
     {
     }
@@ -75,10 +75,26 @@ struct basic_process_handle_signal
     {
     }
 
+    basic_process_handle_signal(basic_process_handle_signal && handle)
+    : pid_(handle.pid_), signal_set_(handle.signal_set_.get_executor(), SIGCHLD)
+    {
+        handle.pid_ = -1;
+    }
+
+    basic_process_handle_signal& operator=(basic_process_handle_signal && handle)
+    {
+        pid_ = handle.id();
+        //signal_set_ = BOOST_PROCESS_V2_ASIO_NAMESPACE::basic_signal_set<Executor>(handle.get_executor(), SIGCHLD);
+        handle.pid_ = -1;
+        return *this;
+    }
+
+
     template<typename Executor1>
     basic_process_handle_signal(basic_process_handle_signal<Executor1> && handle)
     : pid_(handle.pid_), signal_set_(Executor1(handle.signal_set_.get_executor()), SIGCHLD)
     {
+        handle.pid_ = -1;
     }
 
     pid_type id() const
@@ -178,12 +194,12 @@ struct basic_process_handle_signal
             detail::throw_error(ec, "terminate");
     }
 
-    bool running(native_exit_code_type &exit_code, error_code ec)
+    bool running(native_exit_code_type &exit_code, error_code & ec)
     {
         if (pid_ <= 0)
             return false;
         int code = 0;
-        int res = ::waitpid(pid_, &code, 0);
+        int res = ::waitpid(pid_, &code, WNOHANG);
         if (res == -1)
             ec = get_last_error();
         else
@@ -238,13 +254,17 @@ struct basic_process_handle_signal
         void operator()(Self &&self)
         {
             error_code ec;
-            native_exit_code_type exit_code;
+            native_exit_code_type exit_code{};
+            int wait_res = -1;
             if (pid_ <= 0) // error, complete early
                 ec = BOOST_PROCESS_V2_ASIO_NAMESPACE::error::bad_descriptor;
-            else if (::waitpid(pid_, &exit_code, 0) == -1)
-                ec = get_last_error();
-
-            if (!ec && process_is_running(exit_code))
+            else 
+            {
+                wait_res = ::waitpid(pid_, &exit_code, WNOHANG);
+                if (wait_res == -1)
+                    ec = get_last_error();
+            }
+            if (!ec && (wait_res == 0))
             {
                 handle.async_wait(std::move(self));
                 return ;
@@ -268,7 +288,7 @@ struct basic_process_handle_signal
         template<typename Self>
         void operator()(Self &&self, error_code ec, int )
         {
-            native_exit_code_type exit_code;
+            native_exit_code_type exit_code{};
             if (!ec)
                 if (::waitpid(pid_, &exit_code, 0) == -1)
                     ec = get_last_error();

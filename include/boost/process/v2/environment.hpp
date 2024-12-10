@@ -13,6 +13,7 @@
 #include <boost/process/v2/detail/config.hpp>
 #include <boost/process/v2/cstring_ref.hpp>
 #include <boost/process/v2/detail/utf8.hpp>
+#include <functional>
 #include <memory>
 #include <numeric>
 
@@ -34,27 +35,30 @@ namespace environment
 
 /// A char traits type that reflects the OS rules for string representing environment keys.
 /** Can be an alias of std::char_traits. May only be defined for `char` and `wchar_t`.
+ * 
+ * Windows treats keys as case-insensitive yet perserving. The char traits are made to reflect 
+ * that behaviour.
 */
 tempalte<typename Char>
-using key_char_traits = implementation-defined ;
+using key_char_traits = implementation_defined ;
 
 /// A char traits type that reflects the OS rules for string representing environment values.
 /** Can be an alias of std::char_traits. May only be defined for `char` and `wchar_t`.
 */
 tempalte<typename Char>
-using value_char_traits = implementation-defined ;
+using value_char_traits = implementation_defined ;
 
 /// The character type used by the environment. Either `char` or `wchar_t`.
-using char_type = implementation-defined ;
+using char_type = implementation_defined ;
 
 /// The equal character in an environment string used to separate key and value.
-constexpr char_type equality_sign = implementation-defined;
+constexpr char_type equality_sign = implementation_defined;
 
 /// The delimiter in environemtn lists. Commonly used by the `PATH` variable.
-constexpr char_type equality_sign = implementation-defined;
+constexpr char_type delimiter = implementation_defined;
 
 /// The native handle of an environment. Note that this can be an owning pointer and is generally not thread safe.
-using native_handle = implementation-defined;
+using native_handle = implementation_defined;
 
 
 #endif
@@ -151,7 +155,7 @@ struct key_view
     std::basic_string<CharT,Traits,Alloc>
     basic_string( const Alloc& alloc = Alloc()) const
     {
-        return boost::process::v2::detail::conv_string<CharT, Traits>(
+        return BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<CharT, Traits>(
             value_.data(), value_.size(), alloc);
     }
 
@@ -176,7 +180,7 @@ struct key_view
     friend std::basic_ostream<CharT,Traits>&
     operator<<( std::basic_ostream<CharT,Traits>& os, const key_view& p )
     {
-        os << boost::process::v2::quoted(p.basic_string<CharT,Traits>());
+        os << BOOST_PROCESS_V2_NAMESPACE::quoted(p.basic_string<CharT,Traits>());
         return os;
     }
 
@@ -185,7 +189,7 @@ struct key_view
     operator>>( std::basic_istream<CharT,Traits>& is, key_view& p )
     {
         std::basic_string<CharT, Traits> t;
-        is >> boost::process::v2::quoted(t);
+        is >> BOOST_PROCESS_V2_NAMESPACE::quoted(t);
         p = t;
         return is;
     }
@@ -195,6 +199,7 @@ struct key_view
     string_view_type value_;
 };
 
+/// A view for a value in an environment
 struct value_view
 {
     using value_type       = char_type;
@@ -239,7 +244,7 @@ struct value_view
     std::basic_string<CharT,Traits,Alloc>
     basic_string( const Alloc& alloc = Alloc() ) const
     {
-        return boost::process::v2::detail::conv_string<CharT, Traits>(
+        return BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<CharT, Traits>(
                 value_.data(), value_.size(),  alloc);
     }
 
@@ -265,7 +270,7 @@ struct value_view
     friend std::basic_ostream<CharT,Traits>&
     operator<<( std::basic_ostream<CharT,Traits>& os, const value_view& p )
     {
-        os << boost::process::v2::quoted(p.basic_string<CharT,Traits>());
+        os << BOOST_PROCESS_V2_NAMESPACE::quoted(p.basic_string<CharT,Traits>());
         return os;
     }
 
@@ -274,7 +279,7 @@ struct value_view
     operator>>( std::basic_istream<CharT,Traits>& is, value_view& p )
     {
         std::basic_string<CharT, Traits> t;
-        is >> boost::process::v2::quoted(t);
+        is >> BOOST_PROCESS_V2_NAMESPACE::quoted(t);
         p = t;
         return is;
     }
@@ -289,6 +294,7 @@ struct value_view
     string_view_type value_;
 };
 
+/// A view for a key value pair in an environment
 struct key_value_pair_view
 {
   using value_type       = char_type;
@@ -347,7 +353,7 @@ struct key_value_pair_view
   std::basic_string<CharT,Traits,Alloc>
   basic_string( const Alloc& alloc = Alloc()) const
   {
-      return boost::process::v2::detail::conv_string<CharT, Traits>(value_.begin(), value_.size(), alloc);
+      return BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<CharT, Traits>(value_.begin(), value_.size(), alloc);
   }
 
   std::string string() const       {return basic_string<char>();}
@@ -396,7 +402,7 @@ struct key_value_pair_view
   friend std::basic_ostream<CharT,Traits>&
   operator<<( std::basic_ostream<CharT,Traits>& os, const key_value_pair_view& p )
   {
-      os << boost::process::v2::quoted(p.basic_string<CharT,Traits>());
+      os << BOOST_PROCESS_V2_NAMESPACE::quoted(p.basic_string<CharT,Traits>());
       return os;
   }
 
@@ -405,14 +411,14 @@ struct key_value_pair_view
   operator>>( std::basic_istream<CharT,Traits>& is, key_value_pair_view& p )
   {
       std::basic_string<CharT, Traits> t;
-      is >> boost::process::v2::quoted(t);
+      is >> BOOST_PROCESS_V2_NAMESPACE::quoted(t);
       p = t;
       return is;
   }
 
   template<std::size_t Idx>
-  inline auto get() const -> typename conditional<Idx == 0u, boost::process::v2::environment::key_view,
-                                                             boost::process::v2::environment::value_view>::type;
+  inline auto get() const -> typename conditional<Idx == 0u, BOOST_PROCESS_V2_NAMESPACE::environment::key_view,
+                                                             BOOST_PROCESS_V2_NAMESPACE::environment::value_view>::type;
   const value_type * c_str() const noexcept
   {
     return value_.data();
@@ -437,6 +443,44 @@ inline value_view key_value_pair_view::get<1u>() const
     return value();
 }
 
+namespace detail
+{
+
+template<typename Char>
+std::size_t hash_step(std::size_t prev, Char c, std::char_traits<Char>)
+{
+    return prev ^ (c << 1);
+}
+
+}
+
+inline std::size_t hash_value(const key_view & value)
+{
+    std::size_t hash = 0u;
+    for (auto c = value.data(); *c != *v2::detail::null_char_(*c); c++)
+        hash = detail::hash_step(hash, *c, key_view::traits_type{});
+    return hash ;
+}
+
+
+inline std::size_t hash_value(const BOOST_PROCESS_V2_NAMESPACE::environment::value_view & value)
+{
+    std::size_t hash = 0u;
+    for (auto c = value.data(); *c != *v2::detail::null_char_(*c); c++)
+        hash = detail::hash_step(hash, *c, value_view::traits_type{});
+    return hash ;
+}
+
+
+inline std::size_t hash_value(const BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view & value)
+{
+    std::size_t hash = 0u;
+    for (auto c = value.data(); *c != *v2::detail::null_char_(*c); c++)
+        hash = detail::hash_step(hash, *c, key_value_pair_view::traits_type{});
+    return hash ;
+}
+
+/// A class representing a key within an environment.
 struct key
 {
     using value_type       = char_type;
@@ -460,20 +504,20 @@ struct key
         decltype(source.data()) = nullptr,
         decltype(source.size()) = 0u)
         : value_(
-             boost::process::v2::detail::conv_string<char_type, traits_type>(
+             BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
                 source.data(), source.size()))
     {
     }
 
     key(const typename conditional<is_same<value_type, char>::value, wchar_t, char>::type  * raw)
-        : value_(boost::process::v2::detail::conv_string<char_type, traits_type>(
+        : value_(BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
                 raw, std::char_traits<std::decay<std::remove_pointer<decltype(raw)>::type>::type>::length(raw)))
     {
     }
 
     template< class InputIt >
     key( InputIt first, InputIt last)
-        : key(std::basic_string<typename std::iterator_traits<std::decay_t<InputIt>>::value_type>(first, last))
+        : key(std::basic_string<typename std::iterator_traits<typename std::decay<InputIt>::type>::value_type>(first, last))
     {
     }
 
@@ -489,7 +533,7 @@ struct key
     template< class Source >
     key& operator=( const Source& source )
     {
-        value_ = boost::process::v2::detail::conv_string<char_type, traits_type>(source.data(), source.size());
+        value_ = BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(source.data(), source.size());
         return *this;
     }
 
@@ -501,7 +545,7 @@ struct key
     template< class Source >
     key& assign( const Source& source )
     {
-        value_ = boost::process::v2::detail::conv_string<char_type, traits_type>(source.data(), source.size());
+        value_ = BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(source.data(), source.size());
         return *this;
     }
 
@@ -509,7 +553,7 @@ struct key
     key& assign( InputIt first, InputIt last )
     {
 
-        return assign(std::basic_string<typename std::iterator_traits<std::decay_t<InputIt>>::value_type>(first, last));
+        return assign(std::basic_string<typename std::iterator_traits<typename std::decay<InputIt>::type>::value_type>(first, last));
     }
 
     void clear() {value_.clear();}
@@ -536,7 +580,7 @@ struct key
     std::basic_string<CharT,Traits,Alloc>
     basic_string( const Alloc& alloc = Alloc()) const
     {
-        return boost::process::v2::detail::conv_string<CharT, Traits>(
+        return BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<CharT, Traits>(
             value_.data(), value_.size(), alloc);
     }
 
@@ -562,7 +606,7 @@ struct key
     friend std::basic_ostream<CharT,Traits>&
     operator<<( std::basic_ostream<CharT,Traits>& os, const key& p )
     {
-        os << boost::process::v2::quoted(p.basic_string<CharT,Traits>());
+        os << BOOST_PROCESS_V2_NAMESPACE::quoted(p.basic_string<CharT,Traits>());
         return os;
     }
 
@@ -571,7 +615,7 @@ struct key
     operator>>( std::basic_istream<CharT,Traits>& is, key& p )
     {
         std::basic_string<CharT, Traits> t;
-        is >> boost::process::v2::quoted(t);
+        is >> BOOST_PROCESS_V2_NAMESPACE::quoted(t);
         p = t;
         return is;
     }
@@ -582,6 +626,7 @@ struct key
     string_type value_;
 };
 
+#if !defined(GENERATING_DOCUMENTATION)
 
 template<typename T, typename U>
 typename std::enable_if<
@@ -643,6 +688,18 @@ typename std::enable_if<
         bool>::type
 operator >(const T  &l, const U & r) { return key_view(l) >  key_view(r); }
 
+#else
+
+
+bool operator==(const value_view &, const value_view);
+bool operator!=(const value_view &, const value_view);
+bool operator<=(const value_view &, const value_view);
+bool operator< (const value_view &, const value_view);
+bool operator> (const value_view &, const value_view);
+bool operator>=(const value_view &, const value_view);
+
+#endif
+
 
 struct value
 {
@@ -665,20 +722,20 @@ struct value
     value( const Source& source,
            decltype(source.data()) = nullptr,
     decltype(source.size()) = 0u)
-    : value_(boost::process::v2::detail::conv_string<char_type, traits_type>(
+    : value_(BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
         source.data(), source.size()))
     {
     }
 
     value(const typename conditional<is_same<value_type, char>::value, wchar_t, char>::type  * raw)
-            : value_(boost::process::v2::detail::conv_string<char_type, traits_type>(
+            : value_(BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
             raw, std::char_traits<std::decay<std::remove_pointer<decltype(raw)>::type>::type>::length(raw)))
     {
     }
 
     template< class InputIt >
     value( InputIt first, InputIt last)
-            : value(std::basic_string<typename std::iterator_traits<std::decay_t<InputIt>>::value_type>(first, last))
+            : value(std::basic_string<typename std::iterator_traits<typename std::decay<InputIt>::type>::value_type>(first, last))
     {
     }
 
@@ -694,7 +751,7 @@ struct value
     template< class Source >
     value& operator=( const Source& source )
     {
-        value_ = boost::process::v2::detail::conv_string<char_type, traits_type>(
+        value_ = BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
             source.data(), source.size);
         return *this;
     }
@@ -707,7 +764,7 @@ struct value
     template< class Source >
     value& assign( const Source& source )
     {
-      value_ = boost::process::v2::detail::conv_string<char_type, traits_type>(
+      value_ = BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
           source.data(), source.size());
       return *this;
     }
@@ -715,7 +772,7 @@ struct value
     template< class InputIt >
     value& assign( InputIt first, InputIt last )
     {
-        return assign(std::basic_string<typename std::iterator_traits<std::decay_t<InputIt>>::value_type>(first, last));
+        return assign(std::basic_string<typename std::iterator_traits<typename std::decay<InputIt>::type>::value_type>(first, last));
     }
 
     void push_back(const value & sv)
@@ -748,7 +805,7 @@ struct value
     std::basic_string<CharT,Traits,Alloc>
     basic_string( const Alloc& alloc = Alloc()) const
     {
-        return boost::process::v2::detail::conv_string<CharT, Traits>(
+        return BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<CharT, Traits>(
             value_.data(), value_.size(),alloc);
     }
 
@@ -774,7 +831,7 @@ struct value
     friend std::basic_ostream<CharT,Traits>&
     operator<<( std::basic_ostream<CharT,Traits>& os, const value& p )
     {
-        os << boost::process::v2::quoted(p.basic_string<CharT,Traits>());
+        os << BOOST_PROCESS_V2_NAMESPACE::quoted(p.basic_string<CharT,Traits>());
         return os;
     }
 
@@ -783,7 +840,7 @@ struct value
     operator>>( std::basic_istream<CharT,Traits>& is, value& p )
     {
         std::basic_string<CharT, Traits> t;
-        is >> boost::process::v2::quoted(t);
+        is >> BOOST_PROCESS_V2_NAMESPACE::quoted(t);
         p = t;
         return is;
     }
@@ -798,6 +855,7 @@ struct value
 };
 
 
+#if !defined(GENERATING_DOCUMENTATION)
 
 template<typename T, typename U>
 typename std::enable_if<
@@ -859,8 +917,16 @@ typename std::enable_if<
         bool>::type
 operator >(const T  &l, const U & r) { return value_view(l) >  value_view(r); }
 
+#else
 
+bool operator==(const value_view &, const value_view);
+bool operator!=(const value_view &, const value_view);
+bool operator<=(const value_view &, const value_view);
+bool operator< (const value_view &, const value_view);
+bool operator> (const value_view &, const value_view);
+bool operator>=(const value_view &, const value_view);
 
+#endif
 
 struct key_value_pair
 {
@@ -878,7 +944,7 @@ struct key_value_pair
     key_value_pair(key_view key, std::initializer_list<basic_string_view<char_type>> values)
     {
         const auto sz = std::accumulate(values.begin(), values.end(),
-                                        key.size(), [](std::size_t sz, const auto & str) { return sz + str.size() + 1;});
+                                        key.size(), [](std::size_t sz, const basic_string_view<char_type> & str) { return sz + str.size() + 1;});
 
         value_.reserve(sz);
         value_.append(key.data(), key.size());
@@ -902,20 +968,22 @@ struct key_value_pair
     key_value_pair( const Source& source,
            decltype(source.data()) = nullptr,
            decltype(source.size()) = 0u)
-            : value_(boost::process::v2::detail::conv_string<char_type, traits_type>(
+            : value_(BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
                 source.data(), source.size()))
     {
     }
 
+    template< typename Key, 
+              typename Value >
+    key_value_pair(
+         const std::pair<Key, Value> & kv/*,
+         typename std::enable_if<std::is_constructible<struct key,   Key >::value && 
+                                 std::is_constructible<struct value, Value>::value
+                >::type = 0*/) : value_(((struct key)(kv.first)).string() + equality_sign + ((struct value)(kv.second)).string())
+    {}
+
     key_value_pair(const typename conditional<is_same<value_type, char>::value, wchar_t, char>::type  * raw)
-            : value_(boost::process::v2::detail::conv_string<char_type, traits_type>(
-                     raw,
-                     std::char_traits<std::decay<std::remove_pointer<decltype(raw)>::type>::type>::length(raw)))
-    {
-    }
-    key_value_pair(const typename conditional<is_same<value_type, char>::value, wchar_t, char>::type  * raw,
-                   const std::locale& loc)
-            : value_(boost::process::v2::detail::conv_string<char_type, traits_type>(
+            : value_(BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
                      raw,
                      std::char_traits<std::decay<std::remove_pointer<decltype(raw)>::type>::type>::length(raw)))
     {
@@ -923,7 +991,7 @@ struct key_value_pair
 
     template< class InputIt , typename std::iterator_traits<InputIt>::iterator_category>
     key_value_pair( InputIt first, InputIt last )
-            : key_value_pair(std::basic_string<typename std::iterator_traits<std::decay_t<InputIt>>::value_type>(first, last))
+            : key_value_pair(std::basic_string<typename std::iterator_traits<typename std::decay<InputIt>::type>::value_type>(first, last))
     {
     }
 
@@ -939,7 +1007,7 @@ struct key_value_pair
     template< class Source >
     key_value_pair& operator=( const Source& source )
     {
-        value_ = boost::process::v2::detail::conv_string<char_type, traits_type>(
+        value_ = BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
             source.data(), source.size());
         return *this;
     }
@@ -952,7 +1020,7 @@ struct key_value_pair
     template< class Source >
     key_value_pair& assign( const Source& source )
     {
-        value_ = boost::process::v2::detail::conv_string<char_type, traits_type>(
+        value_ = BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<char_type, traits_type>(
             source.data(), source.size());
         return *this;
     }
@@ -961,7 +1029,7 @@ struct key_value_pair
     template< class InputIt >
     key_value_pair& assign( InputIt first, InputIt last )
     {
-        return assign(std::basic_string<typename std::iterator_traits<std::decay_t<InputIt>>::value_type>(first, last));
+        return assign(std::basic_string<typename std::iterator_traits<typename std::decay<InputIt>::type>::value_type>(first, last));
     }
 
     void clear() {value_.clear();}
@@ -1001,7 +1069,7 @@ struct key_value_pair
     std::basic_string<CharT,Traits,Alloc>
     basic_string( const Alloc& alloc = Alloc() ) const
     {
-        return boost::process::v2::detail::conv_string<CharT, Traits>(value_.data(), value_.size(), alloc);
+        return BOOST_PROCESS_V2_NAMESPACE::detail::conv_string<CharT, Traits>(value_.data(), value_.size(), alloc);
     }
 
     std::string string() const       {return basic_string<char>();}
@@ -1032,7 +1100,7 @@ struct key_value_pair
         }
         const auto k = native_view().substr(0, eq);
 
-        return boost::process::v2::environment::key_view::string_view_type (k.data(), k.size());
+        return BOOST_PROCESS_V2_NAMESPACE::environment::key_view::string_view_type (k.data(), k.size());
     }
     struct value_view value() const
     {
@@ -1050,7 +1118,7 @@ struct key_value_pair
     friend std::basic_ostream<CharT,Traits>&
     operator<<( std::basic_ostream<CharT,Traits>& os, const key_value_pair& p )
     {
-        os << boost::process::v2::quoted(p.basic_string<CharT,Traits>());
+        os << BOOST_PROCESS_V2_NAMESPACE::quoted(p.basic_string<CharT,Traits>());
         return os;
     }
 
@@ -1058,23 +1126,23 @@ struct key_value_pair
     friend std::basic_istream<CharT,Traits>&
     operator>>( std::basic_istream<CharT,Traits>& is, key_value_pair& p )
     {
-        is >> boost::process::v2::quoted(p.value_);
+        is >> BOOST_PROCESS_V2_NAMESPACE::quoted(p.value_);
         return is;
     }
 
-    template<std::size_t Idx>
-    inline auto get() const 
-        -> typename conditional<Idx == 0u, boost::process::v2::environment::key_view,
-                                           boost::process::v2::environment::value_view>::type;
-
     const value_type * data() const {return value_.data(); }
     std::size_t size() const {return value_.size(); }
+
+    template<std::size_t Idx>
+    inline auto get() const 
+            -> typename conditional<Idx == 0u, BOOST_PROCESS_V2_NAMESPACE::environment::key_view,
+                                            BOOST_PROCESS_V2_NAMESPACE::environment::value_view>::type;
 
 private:
     string_type value_;
 };
 
-
+#if !defined(GENERATING_DOCUMENTATION)
 
 template<typename T, typename U>
 typename std::enable_if<
@@ -1136,6 +1204,17 @@ typename std::enable_if<
         bool>::type
 operator >(const T  &l, const U & r) { return key_value_pair_view(l) >  key_value_pair_view(r); }
 
+#else
+
+bool operator==(const key_value_pair_view &, const key_value_pair_view);
+bool operator!=(const key_value_pair_view &, const key_value_pair_view);
+bool operator<=(const key_value_pair_view &, const key_value_pair_view);
+bool operator< (const key_value_pair_view &, const key_value_pair_view);
+bool operator> (const key_value_pair_view &, const key_value_pair_view);
+bool operator>=(const key_value_pair_view &, const key_value_pair_view);
+
+#endif
+
 
 template<>
 inline key_view key_value_pair::get<0u>() const
@@ -1149,6 +1228,86 @@ inline value_view key_value_pair::get<1u>() const
     return value();
 }
 
+}
+BOOST_PROCESS_V2_END_NAMESPACE
+
+namespace std
+{
+
+template<>
+class tuple_size<BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair> : integral_constant<std::size_t, 2u> {};
+
+template<>
+class tuple_element<0u, BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair> 
+{
+  public: 
+    using type = BOOST_PROCESS_V2_NAMESPACE::environment::key_view;
+};
+
+template<>
+class tuple_element<1u, BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair> 
+{
+  public: 
+    using type = BOOST_PROCESS_V2_NAMESPACE::environment::value_view;
+};
+
+template<std::size_t Idx>
+inline auto get(const BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair & kvp) 
+        -> typename std::tuple_element<Idx, BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair>::type
+{
+    return kvp.get<Idx>();
+}
+
+template<>
+class tuple_size<BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view> : integral_constant<std::size_t, 2u> {};
+
+template<>
+class tuple_element<0u, BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view>
+{
+  public:
+    using type = BOOST_PROCESS_V2_NAMESPACE::environment::key_view;
+};
+
+template<>
+class tuple_element<1u, BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view>
+{
+  public:
+    using type = BOOST_PROCESS_V2_NAMESPACE::environment::value_view;
+};
+
+template<std::size_t Idx>
+inline auto get(BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view kvp) 
+        -> typename std::tuple_element<Idx, BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view>::type
+{
+    return kvp.get<Idx>();
+}
+
+}
+
+BOOST_PROCESS_V2_BEGIN_NAMESPACE
+namespace environment 
+{
+
+
+/// A view object for the current environment of this process.
+/**
+ * The view might (windows) or might not (posix) be owning;
+ * if it owns it will deallocate the on destruction, like a unique_ptr.
+ * 
+ * Note that accessing the environment in this way is not thread-safe.
+ * 
+ * @code
+ * 
+ * void dump_my_env(current_view env = current())
+ * {
+ *    for (auto  & [k, v] : env)
+ *        std::cout << k.string() << " = "  << v.string() << std::endl;
+ * }
+ * 
+ * @endcode
+ * 
+ * 
+ */ 
 struct current_view
 {
     using native_handle_type = environment::native_handle_type;
@@ -1204,77 +1363,133 @@ struct current_view
                     detail::native_handle_deleter> handle_{environment::detail::load_native_handle()};
 };
 
+/// Obtain a handle to the current environment
 inline current_view current() {return current_view();}
 
-template<typename Environment = current_view>
-inline boost::process::v2::filesystem::path home(Environment && env = current())
+namespace detail
 {
-  auto find_key = [&](key_view ky) -> value
-  {
+
+template<typename Environment>
+auto find_key(Environment & env, key_view ky) 
+    -> typename std::enable_if<std::is_convertible<decltype(*std::begin(env)), key_value_pair_view>::value, value_view>::type
+{
     const auto itr = std::find_if(std::begin(env), std::end(env),
-                                  [&](key_value_pair vp)
+                                  [&](key_value_pair_view vp)
                                   {
-                                    auto tmp =  vp.key() == ky;
+                                    auto tmp = std::get<0>(vp) == ky;
                                     if (tmp)
                                       return true;
                                     else
                                       return false;
                                   });
-    if (itr != nullptr)
-      return itr->value_view();
+    
+    if (itr != std::end(env))
+      return key_value_pair_view(*itr).value();
     else
-      return value_view();
-  };
+      return {};
+}
+
+template<typename Environment>
+auto find_key(Environment & env, key_view ky) 
+    -> typename std::enable_if<
+    !std::is_convertible<decltype(*std::begin(env)), key_value_pair_view>::value && 
+     std::is_convertible<decltype(*std::begin(env)), key_value_pair>::value, 
+    value>::type
+{
+    const auto itr = std::find_if(std::begin(env), std::end(env),
+                                  [&](key_value_pair vp)
+                                  {
+                                    auto tmp = std::get<0>(vp) == ky;
+                                    if (tmp)
+                                      return true;
+                                    else
+                                      return false;
+                                  });
+    if (itr != std::end(env))
+      return key_value_pair(*itr).value();
+    else
+      return {};
+}
+
+
+}
+
+
+/// Find the home folder in an environment-like type.
+/** 
+ * @param env The environment to search. Defaults to the current environment of this process
+ * 
+ * The environment type passed in must be a range with value T that fulfills the following requirements:
+ * 
+ *  For `T value`
+ *
+ *  - std::get<0>(value) must return a type comparable to `key_view`.
+ *  - std::get<1>(value) must return a type convertible to filesystem::path.
+ * 
+ * @return A filesystem::path to the home directory or an empty path if it cannot be found.
+ * 
+ */
+template<typename Environment = current_view>
+inline filesystem::path home(Environment && env = current())
+{
 #if defined(ASIO_WINDOWS)
-  return find_key(L"HOMEDRIVE") + find_key(L"HOMEPATH");
+  return detail::find_key(env, L"HOMEDRIVE") + detail::find_key(env, L"HOMEPATH").native_string();
 #else
-  return find_key(L"HOME");
+  return detail::find_key(env, "HOME").native_string();
 #endif
 }
 
+/// Find the executable `name` in an environment-like type.
+/** 
+ * @param env The environment to search. Defaults to the current environment of this process
+ * 
+ * The environment type passed in must be a range with value T that fulfills the following requirements:
+ * 
+ *  For `T value`
+ *
+ *  - std::get<0>(value) must return a type comparable to `key_view`.
+ *  - std::get<1>(value) must return a type convertible to `value_view`.
+ * 
+ * 
+ * @return A filesystem::path to the executable or an empty path if it cannot be found.
+ * 
+ */
 template<typename Environment = current_view>
-inline boost::process::v2::filesystem::path find_executable(
-                                             boost::process::v2::filesystem::path name,
+inline BOOST_PROCESS_V2_NAMESPACE::filesystem::path find_executable(
+                                             BOOST_PROCESS_V2_NAMESPACE::filesystem::path name,
                                              Environment && env = current())
 {
-    auto find_key = [&](key_view ky) -> value_view
-                    {
-                        const auto itr = std::find_if(std::begin(env), std::end(env),
-                                            [&](key_value_pair vp)
-                                            {
-                                                auto tmp =  vp.key() == ky;
-                                                if (tmp)
-                                                    return true;
-                                                else
-                                                    return false;
-                                            });
-                        if (itr != nullptr)
-                          return (*itr).value();
-                        else
-                          return value_view();
-                    };
 
 #if defined(BOOST_PROCESS_V2_WINDOWS)
-    auto path = find_key(L"PATH");
-    auto pathext = find_key(L"PATHEXT");
-    for (auto pp_view : path)
-        for (auto ext : pathext)
-        {
-            boost::process::v2::filesystem::path nm(name);
-            nm.concat(ext.begin(), ext.end());
-
-            auto p = boost::process::v2::filesystem::path(pp_view.begin(), pp_view.end()) / nm;
-
-            error_code ec;
-            bool is_exec = detail::is_executable(p, ec);
-            if (!ec && is_exec)
-                return p;
-        }
-#else
-    auto path = find_key("PATH");
+    auto path = detail::find_key(env, L"PATH");
+    auto pathext = detail::find_key(env, L"PATHEXT");
     for (auto pp_view : path)
     {
-        auto p = boost::process::v2::filesystem::path(pp_view.begin(), pp_view.end()) / name;
+        // first check if it has the extension already
+        BOOST_PROCESS_V2_NAMESPACE::filesystem::path full_nm(name);
+        BOOST_PROCESS_V2_NAMESPACE::filesystem::path pp(pp_view.begin(), pp_view.end());
+        auto p = pp / nm;
+        error_code ec;
+
+        if (detail::is_executable(p, ec) && !ec)
+            return p;
+
+        for (auto ext : pathext)
+        {
+            ec.clear();
+            BOOST_PROCESS_V2_NAMESPACE::filesystem::path nm(name);
+            nm.concat(ext.begin(), ext.end());
+
+            auto p = pp / nm;
+
+            if (detail::is_executable(p, ec) && !ec)
+                return p;
+        }
+    }
+#else
+    for (auto pp_view : detail::find_key(env, "PATH"))
+    {
+        auto p = BOOST_PROCESS_V2_NAMESPACE::filesystem::path(pp_view.begin(), pp_view.end()) / name;
         error_code ec;
         bool is_exec = detail::is_executable(p, ec);
         if (!ec && is_exec)
@@ -1284,173 +1499,165 @@ inline boost::process::v2::filesystem::path find_executable(
     return {};
 }
 
-
+/// Get an environment variable from the current process.
 inline value get(const key & k, error_code & ec) { return detail::get(k.c_str(), ec);}
+/// Throwing @overload value get(const key & k, error_code & ec)
 inline value get(const key & k)
 {
   error_code ec;
   auto tmp = detail::get(k.c_str(), ec);
-  boost::process::v2::detail::throw_error(ec, "environment::get");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::get");
   return tmp;
 }
 
+/// Disambiguating @overload value get(const key & k, error_code & ec)
 inline value get(basic_cstring_ref<char_type, key_char_traits<char_type>> k, error_code & ec)
 {
   return detail::get(k, ec);
 }
+/// Disambiguating @overload value get(const key & k)
 inline value get(basic_cstring_ref<char_type, key_char_traits<char_type>> k)
 {
   error_code ec;
   auto tmp = detail::get(k, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::get");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::get");
   return tmp;
 }
 
 
+/// Disambiguating @overload value get(const key & k, error_code & ec)
 inline value get(const char_type * c, error_code & ec) { return detail::get(c, ec);}
+/// Disambiguating @overload value get(const key & k)
 inline value get(const char_type * c)
 {
   error_code ec;
   auto tmp = detail::get(c, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::get");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::get");
   return tmp;
 }
 
+/// Set an environment variable for the current process.
 inline void set(const key & k, value_view vw, error_code & ec) { detail::set(k, vw, ec);}
+/// Throwing @overload void set(const key & k, value_view vw, error_code & ec)
 inline void set(const key & k, value_view vw)
 {
   error_code ec;
   detail::set(k, vw, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::set");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::set");
 }
 
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 inline void set(basic_cstring_ref<char_type, key_char_traits<char_type>> k, value_view vw, error_code & ec) { detail::set(k, vw, ec);}
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 inline void set(basic_cstring_ref<char_type, key_char_traits<char_type>> k, value_view vw)
 {
   error_code ec;
   detail::set(k, vw, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::set");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::set");
 }
 
 
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 inline void set(const char_type * k, value_view vw, error_code & ec) { detail::set(k, vw, ec);}
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 inline void set(const char_type * k, value_view vw)
 {
   error_code ec;
   detail::set(k, vw, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::set");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::set");
 }
 
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 template<typename Char, typename = typename std::enable_if<!std::is_same<Char, char_type>::value>::type>
 inline void set(const key & k, const Char * vw, error_code & ec)
 {
     value val{vw};
     detail::set(k, val, ec);
 }
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 template<typename Char, typename = typename std::enable_if<!std::is_same<Char, char_type>::value>::type>
 inline void set(const key & k, const Char * vw)
 {
     error_code ec;
     value val{vw};
     detail::set(k, val, ec);
-    boost::process::v2::detail::throw_error(ec, "environment::set");
+    BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::set");
 }
 
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 template<typename Char, typename = typename std::enable_if<!std::is_same<Char, char_type>::value>::type>
 inline void set(basic_cstring_ref<char_type, key_char_traits<char_type>> k, const Char * vw, error_code & ec)
 {
     value val{vw};
     detail::set(k, val, ec);
 }
+
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 template<typename Char, typename = typename std::enable_if<!std::is_same<Char, char_type>::value>::type>
 inline void set(basic_cstring_ref<char_type, key_char_traits<char_type>> k, const Char * vw)
 {
     error_code ec;
     value val{vw};
     detail::set(k, val, ec);
-    boost::process::v2::detail::throw_error(ec, "environment::set");
+    BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::set");
 }
 
-
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 template<typename Char, typename = typename std::enable_if<!std::is_same<Char, char_type>::value>::type>
 inline void set(const char_type * k, const Char * vw, error_code & ec)
 {
     value val{vw};
     detail::set(k, val, ec);
 }
+
+/// Disambiguating @overload void set(const key & k, value_view vw, error_code & ec)
 template<typename Char, typename = typename std::enable_if<!std::is_same<Char, char_type>::value>::type>
 inline void set(const char_type * k, const Char * vw)
 {
     error_code ec;
     value val{vw};
     detail::set(k, val, ec);
-    boost::process::v2::detail::throw_error(ec, "environment::set");
+    BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::set");
 }
 
 
-
+/// Remove an environment variable from the current process.
 inline void unset(const key & k, error_code & ec) { detail::unset(k, ec);}
+/// Throwing @overload void unset(const key & k, error_code & ec)
 inline void unset(const key & k)
 {
   error_code ec;
   detail::unset(k, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::unset");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::unset");
 }
 
+/// Disambiguating @overload void unset(const key & k, error_code & ec)
 inline void unset(basic_cstring_ref<char_type, key_char_traits<char_type>> k, error_code & ec)
 {
   detail::unset(k, ec);
 }
+
+/// Disambiguating @overload void unset(const key & k, error_code & ec)
 inline void unset(basic_cstring_ref<char_type, key_char_traits<char_type>> k)
 {
   error_code ec;
   detail::unset(k, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::unset");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::unset");
 }
 
-
+/// Disambiguating @overload void unset(const key & k, error_code & ec)
 inline void unset(const char_type * c, error_code & ec) { detail::unset(c, ec);}
+
+/// Disambiguating @overload void unset(const key & k, error_code & ec)
 inline void unset(const char_type * c)
 {
   error_code ec;
   detail::unset(c, ec);
-  boost::process::v2::detail::throw_error(ec, "environment::unset");
+  BOOST_PROCESS_V2_NAMESPACE::detail::throw_error(ec, "environment::unset");
 }
-}
-
-BOOST_PROCESS_V2_END_NAMESPACE
-
-namespace std
-{
-
-template<>
-struct tuple_size<boost::process::v2::environment::key_value_pair> : integral_constant<std::size_t, 2u> {};
-
-template<>
-struct tuple_element<0u, boost::process::v2::environment::key_value_pair> {using type = boost::process::v2::environment::key_view;};
-
-template<>
-struct tuple_element<1u, boost::process::v2::environment::key_value_pair> {using type = boost::process::v2::environment::value_view;};
-
-template<>
-struct tuple_size<boost::process::v2::environment::key_value_pair_view> : integral_constant<std::size_t, 2u> {};
-
-template<>
-struct tuple_element<0u, boost::process::v2::environment::key_value_pair_view>
-{
-    using type = boost::process::v2::environment::key_view;
-};
-
-template<>
-struct tuple_element<1u, boost::process::v2::environment::key_value_pair_view>
-{
-    using type = boost::process::v2::environment::value_view;
-};
-
 }
 
 // sub process environment stuff
-BOOST_PROCESS_V2_BEGIN_NAMESPACE
 
 #if defined(BOOST_PROCESS_V2_WINDOWS)
 namespace windows { struct default_launcher ;}
@@ -1458,6 +1665,29 @@ namespace windows { struct default_launcher ;}
 namespace posix { struct default_launcher ;}
 #endif 
 
+/// Initializer for the environment of sub process.
+/**
+ * This will set the environment in a subprocess:
+ * 
+ * @code {.cpp}
+ * 
+ * process proc{executor, find_executable("printenv"), {"foo"}, process_environment{"foo=bar"}};
+ * @endcode
+ * 
+ * The environment initializer will persist it's state, so that it can
+ * be used multiple times. Do however note the the Operating System is
+ * allowed to modify the internal state.
+ * 
+ * @code {.cpp}
+ * auto exe = find_executable("printenv");
+ * process_environment env = {"FOO=BAR", "BAR=FOO"};
+ * 
+ * process proc1(executor, exe, {"FOO"}, env);
+ * process proc2(executor, exe, {"BAR"}, env);
+ * @endcode
+ * 
+ * 
+ */
 struct process_environment
 {
 
@@ -1556,9 +1786,8 @@ struct process_environment
   {
     std::vector<const char *> env;
 
-    using char_type = typename decay<decltype((*std::begin(std::declval<Args>()))[0])>::type;
-    for (basic_string_view<char_type> arg : args)
-      env_buffer.push_back(detail::conv_string<char>(arg.data(), arg.size()));
+    for (auto && arg: std::forward<Args>(args))
+      env_buffer.emplace_back(arg);
 
     for (auto && e : env_buffer)
       env.push_back(e.c_str());
@@ -1578,7 +1807,7 @@ struct process_environment
   error_code on_setup(posix::default_launcher & launcher, 
                       const filesystem::path &, const char * const *);
 
-  std::vector<std::string> env_buffer;
+  std::vector<environment::key_value_pair> env_buffer;
   std::vector<const char *> env;
 
 #endif
@@ -1586,7 +1815,73 @@ struct process_environment
 };
 
 
+
 BOOST_PROCESS_V2_END_NAMESPACE
+
+
+namespace std
+{
+
+template<>
+struct hash<BOOST_PROCESS_V2_NAMESPACE::environment::key_view>
+{
+    std::size_t operator()( BOOST_PROCESS_V2_NAMESPACE::environment::key_view kv) const noexcept
+    {
+        return BOOST_PROCESS_V2_NAMESPACE::environment::hash_value(kv);
+    }
+};
+
+
+template<>
+struct hash<BOOST_PROCESS_V2_NAMESPACE::environment::value_view>
+{
+    std::size_t operator()( BOOST_PROCESS_V2_NAMESPACE::environment::value_view kv) const noexcept
+    {
+        return BOOST_PROCESS_V2_NAMESPACE::environment::hash_value(kv);
+    }
+};
+
+template<>
+struct hash<BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view>
+{
+    std::size_t operator()( BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view kv) const noexcept
+    {
+        return BOOST_PROCESS_V2_NAMESPACE::environment::hash_value(kv);
+    }
+};
+
+
+template<>
+struct hash<BOOST_PROCESS_V2_NAMESPACE::environment::key>
+{
+    std::size_t operator()( BOOST_PROCESS_V2_NAMESPACE::environment::key_view kv) const noexcept
+    {
+        return BOOST_PROCESS_V2_NAMESPACE::environment::hash_value(kv);
+    }
+};
+
+
+template<>
+struct hash<BOOST_PROCESS_V2_NAMESPACE::environment::value>
+{
+    std::size_t operator()( BOOST_PROCESS_V2_NAMESPACE::environment::value_view kv) const noexcept
+    {
+        return BOOST_PROCESS_V2_NAMESPACE::environment::hash_value(kv);
+    }
+};
+
+template<>
+struct hash<BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair>
+{
+    std::size_t operator()( BOOST_PROCESS_V2_NAMESPACE::environment::key_value_pair_view kv) const noexcept
+    {
+        return BOOST_PROCESS_V2_NAMESPACE::environment::hash_value(kv);
+    }
+};
+
+}
+
+
 
 #if defined(BOOST_PROCESS_V2_HEADER_ONLY)
 

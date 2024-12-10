@@ -27,30 +27,34 @@ BOOST_CONSTEXPR static const char32_t* null_char_(char32_t) {return U"";}
 BOOST_CONSTEXPR static const char8_t* null_char_(char8_t) {return u8"";}
 #endif
 
-
 }
 
 #if defined(BOOST_PROCESS_V2_STANDALONE)
 using std::basic_string_view;
 using std::   string_view;
 using std::  wstring_view;
-using std::u16string_view;
-using std::u32string_view;
 #else
 using boost::basic_string_view;
 using boost::   string_view;
 using boost::  wstring_view;
-using boost::u16string_view;
-using boost::u32string_view;
 #endif
 
+
+/// Small wrapper for a null-terminated string that can be directly passed to C APIS
+/** This ref can only be modified by moving the front pointer. It does not store the 
+ * size, but can detect values that can directly be passed to system APIs.
+ * 
+ * It can be constructed from a `char*` pointer or any class that has a `c_str()` 
+ * member function, e.g. std::string or boost::static_string.
+ * 
+ */
 template<typename CharT, typename Traits = std::char_traits<CharT>>
 struct basic_cstring_ref
 {
     using value_type             = CharT;
     using traits_type            = Traits;
 
-    BOOST_CONSTEXPR basic_cstring_ref() : view_(detail::null_char_(value_type{})) {}
+    BOOST_CONSTEXPR basic_cstring_ref() noexcept : view_(detail::null_char_(value_type{})) {}
     BOOST_CONSTEXPR basic_cstring_ref(std::nullptr_t) = delete;
 
     BOOST_CONSTEXPR basic_cstring_ref( const value_type* s ) : view_(s) {}
@@ -99,7 +103,7 @@ struct basic_cstring_ref
     BOOST_ATTRIBUTE_NODISCARD BOOST_CONSTEXPR bool empty() const BOOST_NOEXCEPT {return *view_ == *detail::null_char_(CharT{}); }
 
     BOOST_CONSTEXPR const_reference operator[](size_type pos) const  {return view_[pos] ;}
-    BOOST_CONSTEXPR const_reference at(size_type pos) const
+    BOOST_CXX14_CONSTEXPR const_reference at(size_type pos) const
     {
         if (pos >= size())
             throw std::out_of_range("cstring-view out of range");
@@ -109,7 +113,7 @@ struct basic_cstring_ref
     BOOST_CONSTEXPR const_reference back()  const  {return view_[length() - 1];}
     BOOST_CONSTEXPR const_pointer data()    const BOOST_NOEXCEPT  {return view_;}
     BOOST_CXX14_CONSTEXPR void remove_prefix(size_type n)  {view_ = view_ + n;}
-    BOOST_CONSTEXPR void swap(basic_cstring_ref& s) BOOST_NOEXCEPT  {std::swap(view_, s.view_);}
+    void swap(basic_cstring_ref& s) BOOST_NOEXCEPT {std::swap(view_, s.view_);}
 
     size_type copy(value_type* s, size_type n, size_type pos = 0) const
     {
@@ -136,7 +140,7 @@ struct basic_cstring_ref
                traits_type::to_int_type(x[idx]); // will compare to null char of either.
     }
 
-    BOOST_CONSTEXPR bool starts_with(string_view_type x) const BOOST_NOEXCEPT
+    BOOST_CXX14_CONSTEXPR bool starts_with(string_view_type x) const BOOST_NOEXCEPT
     {
         if (x.empty())
             return true;
@@ -153,7 +157,7 @@ struct basic_cstring_ref
         return traits_type::eq(view_[0], x);
     }
 
-    BOOST_CONSTEXPR size_type find( CharT ch, size_type pos = 0 ) const BOOST_NOEXCEPT
+    BOOST_CXX14_CONSTEXPR size_type find( CharT ch, size_type pos = 0 ) const BOOST_NOEXCEPT
     {
         for (auto p = view_ + pos; *p != *null_char_(); p++)
             if (traits_type::eq(*p, ch))
@@ -208,9 +212,6 @@ operator<<(std::basic_ostream<charT, traits>& os,
 {
     return os << static_cast<basic_string_view<charT, traits>>(str);
 }
-
-// Forward declaration of Boost.ContainerHash function
-template <class It> std::size_t hash_range(It, It);
 
 template <class charT, class traits>
 std::size_t hash_value(basic_string_view<charT, traits> s) {

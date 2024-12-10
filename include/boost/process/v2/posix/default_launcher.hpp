@@ -7,6 +7,7 @@
 
 #include <boost/process/v2/detail/config.hpp>
 #include <boost/process/v2/cstring_ref.hpp>
+#include <boost/process/v2/posix/detail/close_handles.hpp>
 #include <boost/process/v2/detail/utf8.hpp>
 
 #if defined(BOOST_PROCESS_V2_STANDALONE)
@@ -26,7 +27,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if defined(__FreeBSD__)
+
+#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__APPLE__) || defined(__MACH__)
 extern "C" { extern char **environ; }
 #endif
 
@@ -289,8 +291,13 @@ inline void on_exec_error(Launcher & launcher, const filesystem::path &executabl
 /// The default launcher for processes on windows.
 struct default_launcher
 {
+    /// The pointer to the environment forwarded to the subprocess.
     const char * const * env = ::environ;
-    int pid;
+    /// The pid of the subprocess - will be assigned after fork.
+    int pid = -1;
+
+    /// The whitelist for file descriptors.
+    std::vector<int> fd_whitelist;
 
     default_launcher() = default;
 
@@ -388,8 +395,12 @@ struct default_launcher
             {
                 ctx.notify_fork(BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context::fork_child);
                 ::close(pg.p[0]);
-
                 ec = detail::on_exec_setup(*this, executable, argv, inits...);
+                if (!ec)
+                {
+                    fd_whitelist.push_back(pg.p[1]);
+                    //close_all_fds(ec);
+                }                
                 if (!ec)
                     ::execve(executable.c_str(), const_cast<char * const *>(argv), const_cast<char * const *>(env));
 
@@ -422,12 +433,19 @@ struct default_launcher
                 return basic_process<Executor>{exec};
             }
         }
-        basic_process<Executor> proc{exec, pid};
+        basic_process<Executor> proc(exec, pid);
         detail::on_success(*this, executable, argv, ec, inits...);
         return proc;
 
     }
   protected:
+
+    void close_all_fds(error_code & ec)
+    {
+        std::sort(fd_whitelist.begin(), fd_whitelist.end());
+        detail::close_all(fd_whitelist, ec);
+        fd_whitelist.clear();
+    }
 
     struct pipe_guard
     {

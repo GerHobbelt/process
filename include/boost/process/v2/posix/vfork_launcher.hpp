@@ -14,7 +14,7 @@ namespace posix
 {
 
 
-/// The default launcher for processes on windows.
+/// A launcher using vfork instead of fork. 
 struct vfork_launcher :  default_launcher
 {
     vfork_launcher() = default;
@@ -103,6 +103,8 @@ struct vfork_launcher :  default_launcher
             ctx.notify_fork(BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context::fork_child);
             ec = detail::on_exec_setup(*this, executable, argv, inits...);
             if (!ec)
+                close_all_fds(ec);
+            if (!ec)
                 ::execve(executable.c_str(), const_cast<char * const *>(argv), const_cast<char * const *>(env));
 
             ec.assign(errno, system_category());
@@ -118,7 +120,7 @@ struct vfork_launcher :  default_launcher
             return basic_process<Executor>{exec};
         }
 
-        basic_process<Executor> proc{exec, pid};
+        basic_process<Executor> proc(exec, pid);
         detail::on_success(*this, executable, argv, ec, inits...);
         return proc;
 

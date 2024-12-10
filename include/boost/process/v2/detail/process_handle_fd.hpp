@@ -54,33 +54,48 @@ struct basic_process_handle_fd
 
     template<typename ExecutionContext>
     basic_process_handle_fd(ExecutionContext &context,
-                                typename std::enable_if<
-                                        std::is_convertible<ExecutionContext &,
-                                                BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context &>::value
-                                >::type = 0)
+                            typename std::enable_if<
+                                std::is_convertible<ExecutionContext &,
+                                    BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context &>::value>::type * = nullptr)
             : pid_(-1), descriptor_(context)
     {
     }
 
-    basic_process_handle_fd(Executor executor)
+    basic_process_handle_fd(executor_type executor)
             : pid_(-1), descriptor_(executor)
     {
     }
 
-    basic_process_handle_fd(Executor executor, pid_type pid)
+    basic_process_handle_fd(executor_type executor, pid_type pid)
             : pid_(pid), descriptor_(executor, syscall(SYS_pidfd_open, pid, 0))
     {
     }
 
-    basic_process_handle_fd(Executor executor, pid_type pid, native_handle_type process_handle)
+    basic_process_handle_fd(executor_type executor, pid_type pid, native_handle_type process_handle)
             : pid_(pid), descriptor_(executor, process_handle)
     {
+    }
+
+    basic_process_handle_fd(basic_process_handle_fd &&handle)
+            : pid_(handle.pid_), descriptor_(std::move(handle.descriptor_))
+    {
+        handle.pid_ = -1;
     }
 
     template<typename Executor1>
     basic_process_handle_fd(basic_process_handle_fd<Executor1> &&handle)
             : pid_(handle.pid_), descriptor_(std::move(handle.descriptor_))
     {
+        handle.pid_ = -1;
+    }
+
+
+    basic_process_handle_fd& operator=(basic_process_handle_fd &&handle)
+    {
+        pid_ = handle.pid_;
+        descriptor_ = std::move(handle.descriptor_);
+        handle.pid_ = -1;
+        return *this;
     }
 
     pid_type id() const
@@ -180,18 +195,20 @@ struct basic_process_handle_fd
             detail::throw_error(ec, "terminate");
     }
 
-    bool running(native_exit_code_type &exit_code, error_code ec)
+    bool running(native_exit_code_type &exit_code, error_code & ec)
     {
         if (pid_ <= 0)
             return false;
         int code = 0;
-        int res = ::waitpid(pid_, &code, 0);
+        int res = ::waitpid(pid_, &code, WNOHANG);
         if (res == -1)
             ec = get_last_error();
+        else if (res == 0)
+            return true;
         else
             ec.clear();
 
-        if (process_is_running(res))
+        if (process_is_running(code))
             return true;
         else
         {
@@ -217,7 +234,7 @@ struct basic_process_handle_fd
         return pid_ != -1;
     }
 
-    template<BOOST_PROCESS_V2_COMPLETION_TOKEN_FOR(void(error_code, int))
+    template<BOOST_PROCESS_V2_COMPLETION_TOKEN_FOR(void(error_code, native_exit_code_type))
     WaitHandler BOOST_PROCESS_V2_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
     BOOST_PROCESS_V2_INITFN_AUTO_RESULT_TYPE(WaitHandler, void (error_code, native_exit_code_type))
     async_wait(WaitHandler &&handler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
@@ -242,13 +259,18 @@ struct basic_process_handle_fd
         void operator()(Self &&self)
         {
             error_code ec;
-            native_exit_code_type exit_code;
+            native_exit_code_type exit_code{};
+            int wait_res = -1;
             if (pid_ <= 0) // error, complete early
                 ec = BOOST_PROCESS_V2_ASIO_NAMESPACE::error::bad_descriptor;
-            else if (::waitpid(pid_, &exit_code, 0) == -1)
-                ec = get_last_error();
+            else 
+            {
+                wait_res = ::waitpid(pid_, &exit_code, WNOHANG);
+                if (wait_res == -1)
+                    ec = get_last_error();
+            }
 
-            if (!ec && process_is_running(exit_code))
+            if (!ec && (wait_res == 0))
             {
                 descriptor.async_wait(
                         BOOST_PROCESS_V2_ASIO_NAMESPACE::posix::descriptor_base::wait_read, std::move(self));
@@ -274,7 +296,7 @@ struct basic_process_handle_fd
         template<typename Self>
         void operator()(Self &&self, error_code ec, int = 0)
         {
-            native_exit_code_type exit_code;
+            native_exit_code_type exit_code{};
             if (!ec)
                 if (::waitpid(pid_, &exit_code, 0) == -1)
                     ec = get_last_error();
