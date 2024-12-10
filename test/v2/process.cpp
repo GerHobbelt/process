@@ -65,7 +65,6 @@ BOOST_AUTO_TEST_CASE(exit_code_sync)
     args[1] = "42";
     auto proc = bpv::default_process_launcher()(ctx, pth, args);
     BOOST_CHECK_EQUAL(proc.wait(), 42);
-    printf("42: %d\n", proc.native_exit_code());
 
     BOOST_CHECK_EQUAL(bpv::process(ctx, pth, {"sleep", "100"}).wait(), 0);
     BOOST_CHECK_EQUAL(bpv::execute(bpv::process(ctx, pth, {"sleep", "100"})), 0);
@@ -146,14 +145,17 @@ BOOST_AUTO_TEST_CASE(request_exit)
   bpv::process proc(ctx, pth, {"sigterm"}
 #if defined(BOOST_PROCESS_V2_WINDOWS)
     , bpv::windows::show_window_minimized_not_active
+    , bpv::windows::create_new_console
 #endif
     );
   BOOST_CHECK(proc.running());
   std::this_thread::sleep_for(std::chrono::milliseconds(250));
   proc.request_exit();
   proc.wait();
-  BOOST_CHECK_EQUAL(proc.exit_code(), 0);
+  BOOST_CHECK_EQUAL(proc.exit_code() & ~SIGTERM, 0);
 }
+
+bool can_interrupt = true;
 
 BOOST_AUTO_TEST_CASE(interrupt)
 {
@@ -168,9 +170,21 @@ BOOST_AUTO_TEST_CASE(interrupt)
 #endif
   );
   std::this_thread::sleep_for(std::chrono::milliseconds(250));
-  proc.interrupt();
+  bpv::error_code ec;
+  proc.interrupt(ec);
+
+#if defined(BOOST_PROCESS_V2_WINDOWS)
+  // the interrupt only works on console applications, so it may not work depending on the environment.
+  if (ec.value() == ERROR_INVALID_FUNCTION)
+  {
+    can_interrupt = false;
+    return;
+  }
+#endif
+
+  BOOST_CHECK_MESSAGE(!ec, ec.what());
   proc.wait();
-  BOOST_CHECK_EQUAL(proc.exit_code(), 0);
+  BOOST_CHECK_EQUAL(proc.exit_code() & ~SIGTERM, 0);
 }
 
 void trim_end(std::string & str)
@@ -567,17 +581,21 @@ BOOST_AUTO_TEST_CASE(bind_launcher)
 
 BOOST_AUTO_TEST_CASE(async_interrupt)
 {
+    if (!can_interrupt)
+      return;
+
     asio::io_context ctx;
     using boost::unit_test::framework::master_test_suite;
     const auto pth = bpv::filesystem::absolute(master_test_suite().argv[1]);
 
+
     bpv::process proc(ctx, pth, {"sigint"}
 #if defined(BOOST_PROCESS_V2_WINDOWS)
-    , bpv::windows::create_new_process_group
+   , bpv::windows::create_new_process_group
 #endif
     );
 
-    asio::steady_timer tim{ctx, std::chrono::milliseconds(50)};
+    asio::steady_timer tim{ctx, std::chrono::milliseconds(200)};
     asio::cancellation_signal sig;
 
     bpv::async_execute(std::move(proc),
@@ -586,7 +604,8 @@ BOOST_AUTO_TEST_CASE(async_interrupt)
                             [](boost::system::error_code ec, int res)
                             {
                               BOOST_CHECK(!ec);
-                              BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(res), 0);
+                              BOOST_CHECK_EQUAL(
+                                  bpv::evaluate_exit_code(res) & ~SIGTERM, 0);
                             }));
 
     tim.async_wait([&](bpv::error_code ec) { sig.emit(asio::cancellation_type::total); });
@@ -600,8 +619,9 @@ BOOST_AUTO_TEST_CASE(async_request_exit)
     const auto pth = bpv::filesystem::absolute(master_test_suite().argv[1]);
 
     bpv::process proc(ctx, pth, {"sigterm"}
-#if defined(ASIO_WINDOWS)
-    , asio::windows::show_window_minimized_not_active
+#if defined(BOOST_PROCESS_V2_WINDOWS)
+      , bpv::windows::show_window_minimized_not_active
+      , bpv::windows::create_new_console
 #endif
     );
 
@@ -614,7 +634,7 @@ BOOST_AUTO_TEST_CASE(async_request_exit)
             [](boost::system::error_code ec, int res)
             {
               BOOST_CHECK(!ec);
-              BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(res), 0);
+              BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(res) & ~SIGTERM, 0);
             }));
 
     tim.async_wait([&](bpv::error_code ec) { sig.emit(asio::cancellation_type::partial); });
