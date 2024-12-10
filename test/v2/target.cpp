@@ -30,7 +30,6 @@ int main(int argc, char * argv[])
             std::cerr << argv[i] << std::endl;
             if (!std::cout || !std::cerr)
                 return 1;
-
         }
     else if (mode == "echo")
         std::cout << std::cin.rdbuf();
@@ -56,13 +55,13 @@ int main(int argc, char * argv[])
     {
         auto p = ::getenv(argv[2]);
         if (p && *p)
-            assert(printf("%s", p) > 0);
+            printf("%s", p);
         else
         {
             printf("Can't find %s in environment\n", argv[2]);
             for (auto e = environ; e != nullptr; e++)
                 printf("    %s\n", *e);
-            return 1;
+            return 3;
         }
     }
 #if defined(BOOST_PROCESS_V2_WINDOWS)

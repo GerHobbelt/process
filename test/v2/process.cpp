@@ -12,7 +12,11 @@
 #if defined(BOOST_FILESYSTEM_DYN_LINK)
 #undef BOOST_FILESYSTEM_DYN_LINK
 #endif
+#define BOOST_TEST_IGNORE_SIGCHLD 1
 
+#if  true //defined(BOOST_POSIX_API)
+#   include <signal.h>
+#endif
 // Test that header file is self-contained.
 #include <boost/process/v2/popen.hpp>
 #include <boost/process/v2/process.hpp>
@@ -73,7 +77,6 @@ BOOST_AUTO_TEST_CASE(exit_code_sync)
     using boost::unit_test::framework::master_test_suite;
     const auto pth =  master_test_suite().argv[1];
     
-    bpv::environment::set("BOOST_PROCESS_V2_TEST_SUBPROCESS", "test");
     boost::asio::io_context ctx;
     
     BOOST_CHECK_EQUAL(bpv::process(ctx, pth, {"exit-code", "0"}).wait(), 0);
@@ -83,41 +86,58 @@ BOOST_AUTO_TEST_CASE(exit_code_sync)
     args[1] = "42";
     auto proc = bpv::default_process_launcher()(ctx, pth, args);
     BOOST_CHECK_EQUAL(proc.wait(), 42);
+    printf("42: %d\n", proc.native_exit_code());
 
     BOOST_CHECK_EQUAL(bpv::process(ctx, pth, {"sleep", "100"}).wait(), 0);
     BOOST_CHECK_EQUAL(bpv::execute(bpv::process(ctx, pth, {"sleep", "100"})), 0);
-
-
 }
 
 BOOST_AUTO_TEST_CASE(exit_code_async)
 {
     using boost::unit_test::framework::master_test_suite;
+    printf("Running exit_code_async\n");
+    auto & mm = master_test_suite();
+    printf("Running exit_code_async %p\n", &mm);
+    printf("Args: '%d'\n", master_test_suite().argc);
+    printf("Exe '%s'\n", master_test_suite().argv[0]);
     const auto pth =  master_test_suite().argv[1];
-    
-    bpv::environment::set("BOOST_PROCESS_V2_TEST_SUBPROCESS", "test");
+    printf("Executing '%s'\n", pth);
+
     boost::asio::io_context ctx;
 
     int called = 0;
+    printf("Setting up processes\n");
     
     bpv::process proc1(ctx, pth, {"exit-code", "0"});
     bpv::process proc3(ctx, pth, {"exit-code", "2"});
     bpv::process proc4(ctx, pth, {"exit-code", "42"});
-    bpv::process proc5(ctx, pth, {"sleep", "100"});;
+    bpv::process proc5(ctx, pth, {"sleep", "100"});
+    bpv::process proc6(ctx, pth, {"sleep", "50"});
 
-    proc1.async_wait([&](bpv::error_code ec, int e) {BOOST_CHECK_MESSAGE(!ec, ec.message()); called++; BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), 0);});
-    bpv::async_execute(
-            bpv::process(ctx, pth, {"exit-code", "1"}),
-            [&](bpv::error_code ec, int e)          {BOOST_CHECK_MESSAGE(!ec, ec.message()); called++; BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), 1);});
-    proc3.async_wait([&](bpv::error_code ec, int e) {BOOST_CHECK_MESSAGE(!ec, ec.message()); called++; BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), 2);});
-    proc4.async_wait([&](bpv::error_code ec, int e) {BOOST_CHECK_MESSAGE(!ec, ec.message()); called++; BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), 42);});
-    proc5.async_wait([&](bpv::error_code ec, int e) {BOOST_CHECK_MESSAGE(!ec, ec.message()); called++; BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), 0);});
-    bpv::async_execute(
-            bpv::process(ctx, pth, {"sleep", "100"}),
-            [&](bpv::error_code ec, int e) {BOOST_CHECK(!ec); called++; BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), 0);});
+#define CPL(Code)                                          \
+    [&](bpv::error_code ec, int e)                         \
+    {                                                      \
+      BOOST_CHECK_MESSAGE(!ec, ec.message());              \
+      called++;                                            \
+      BOOST_CHECK_EQUAL(bpv::evaluate_exit_code(e), Code); \
+    }
+
+    printf("Waiting for processes\n");
+
+    proc1.async_wait(CPL(0));
+    proc3.async_wait(CPL(2));
+    proc4.async_wait(CPL(42));
+    proc5.async_wait(CPL(0));
+    proc6.async_wait(CPL(0));
+    bpv::async_execute(bpv::process(ctx, pth, {"exit-code", "1"}),CPL(1));
+    bpv::async_execute(bpv::process(ctx, pth, {"sleep", "100"}),  CPL(0));
+
+#undef CPL
+
+    printf("Running\n");
 
     ctx.run();
-    BOOST_CHECK_EQUAL(called, 6);
+    BOOST_CHECK_EQUAL(called, 7);
 }
 
 
@@ -409,7 +429,7 @@ std::string read_env(const char * name, Inits && ... inits)
   BOOST_CHECK_MESSAGE((ec == asio::error::broken_pipe) || (ec == asio::error::eof), ec.message());
   out.resize(sz);
   trim_end(out);
-  printf("Read env %s: '%s'\n", name, out.c_str());
+  printf("Read env (%ld) %s: '%s'\n", sz, name, out.c_str());
 
   proc.wait();
   BOOST_CHECK_EQUAL(proc.exit_code(), 0);
@@ -422,11 +442,20 @@ BOOST_AUTO_TEST_CASE(environment)
   std::string path = ::getenv("PATH");
   BOOST_CHECK_EQUAL(read_env("PATH"), ::getenv("PATH"));
 
-  path = "PATH=" + path;
-  BOOST_CHECK_EQUAL("FOO-BAR", read_env("FOOBAR", bpv::process_environment{"FOOBAR=FOO-BAR",  path.c_str()}));
+  auto c = bpv::environment::current();
+  std::vector<bpv::environment::key_value_pair> sub_env(c.begin(), c.end());
+
+  sub_env.push_back("FOOBAR=FOO-BAR");
+  BOOST_CHECK_EQUAL("FOO-BAR", read_env("FOOBAR", bpv::process_environment{sub_env}));
+  
+  sub_env.push_back("XYZ=ZYX");
+  auto itr = std::find_if(sub_env.begin(), sub_env.end(), [](const bpv::environment::key_value_pair & kv) {return kv.key() == "PATH";});
   path += static_cast<char>(bpv::environment::delimiter);
   path += "/bar/foo";
-  BOOST_CHECK_EQUAL(path.substr(5), read_env("PATH", bpv::process_environment{path.c_str(), "XYZ=ZYX"}));
+  bpv::environment::value pval = itr->value();
+  pval.push_back("/bar/foo");
+  *itr = bpv::environment::key_value_pair("PATH", pval);
+  BOOST_CHECK_EQUAL(path, read_env("PATH", bpv::process_environment{sub_env}));
 
 #if defined(BOOST_PROCESS_V2_WINDOWS)
   std::wstring wpath = L"PATh=" + std::wstring(_wgetenv(L"PatH"));

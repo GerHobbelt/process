@@ -19,12 +19,14 @@
 #if defined(BOOST_PROCESS_V2_STANDALONE)
 #include <asio/any_io_executor.hpp>
 #include <asio/compose.hpp>
+#include <asio/dispatch.hpp>
 #include <asio/posix/basic_stream_descriptor.hpp>
 #include <asio/post.hpp>
 #include <asio/windows/signal_set.hpp>
 #else
 #include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/compose.hpp>
+#include <boost/asio/dispatch.hpp>
 #include <boost/asio/posix/basic_stream_descriptor.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/signal_set.hpp>
@@ -153,8 +155,15 @@ struct basic_process_handle_fd_or_signal
     {
         if (pid_ <= 0)
             return;
-        if (::waitpid(pid_, &exit_status, 0) == 1)
-            ec = get_last_error();
+        while (::waitpid(pid_, &exit_status, 0) < 0)
+        {
+            if (errno != EINTR)
+            {
+                ec = get_last_error();
+                break;
+            }               
+        }
+            
     }
 
     void wait(native_exit_code_type &exit_status)
@@ -226,7 +235,7 @@ struct basic_process_handle_fd_or_signal
         if (pid_ <= 0)
             return false;
         int code = 0;
-        int res = ::waitpid(pid_, &code, 0);
+        int res = ::waitpid(pid_, &code, WNOHANG);
         if (res == -1)
             ec = get_last_error();
         else
@@ -280,27 +289,29 @@ struct basic_process_handle_fd_or_signal
         BOOST_PROCESS_V2_ASIO_NAMESPACE::posix::basic_descriptor<Executor> &descriptor;
         BOOST_PROCESS_V2_ASIO_NAMESPACE::basic_signal_set<Executor> &handle;
         pid_type pid_;
+        bool needs_post = true;
 
         template<typename Self>
-        void operator()(Self &&self)
+        void operator()(Self &&self, error_code ec = {}, int = 0)
         {
-            error_code ec;
             native_exit_code_type exit_code{};
             int wait_res = -1;
             if (pid_ <= 0) // error, complete early
                 ec = BOOST_PROCESS_V2_ASIO_NAMESPACE::error::bad_descriptor;
             else 
             {
-                 wait_res = ::waitpid(pid_, &exit_code, WNOHANG);
+                wait_res = ::waitpid(pid_, &exit_code, WNOHANG);
                 if (wait_res == -1)
                     ec = get_last_error();
             }
 
             if (!ec && (wait_res == 0))
             {
+                needs_post = false;
                 if (descriptor.is_open())
                     descriptor.async_wait(
-                            BOOST_PROCESS_V2_ASIO_NAMESPACE::posix::descriptor_base::wait_read, std::move(self));
+                            BOOST_PROCESS_V2_ASIO_NAMESPACE::posix::descriptor_base::wait_read, 
+                            std::move(self));
                 else
                     handle.async_wait(std::move(self));
                 return;
@@ -317,19 +328,14 @@ struct basic_process_handle_fd_or_signal
                     self.complete(ec, code);
                 }
             };
-            BOOST_PROCESS_V2_ASIO_NAMESPACE::post(handle.get_executor(),
-                                                  completer{ec, exit_code, std::move(self)});
 
-        }
+            const auto exec = self.get_executor();
+            completer cpl{ec, exit_code, std::move(self)};
+            if (needs_post)
+                BOOST_PROCESS_V2_ASIO_NAMESPACE::post(exec, std::move(cpl));
+            else
+                BOOST_PROCESS_V2_ASIO_NAMESPACE::dispatch(exec, std::move(cpl));
 
-        template<typename Self>
-        void operator()(Self &&self, error_code ec, int = 0)
-        {
-            native_exit_code_type exit_code{};
-            if (!ec)
-                if (::waitpid(pid_, &exit_code, 0) == -1)
-                    ec = get_last_error();
-            std::move(self).complete(ec, exit_code);
         }
     };
 };
