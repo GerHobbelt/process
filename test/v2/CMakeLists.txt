@@ -1,7 +1,6 @@
 enable_testing()
 
-add_library(boost_process_v2_test_impl test_impl.cpp)
-target_compile_definitions(boost_process_v2_test_impl PUBLIC -DBOOST_PROCESS_V2_SEPARATE_COMPILATION=1)
+add_library(boost_process_v2_test_impl OBJECT test_impl.cpp)
 
 if (WIN32)
     target_compile_definitions(boost_process_v2_test_impl PUBLIC WIN32_LEAN_AND_MEAN=1)
