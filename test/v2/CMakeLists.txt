@@ -1,17 +1,12 @@
 enable_testing()
 
-add_library(boost_process_v2_test_impl OBJECT test_impl.cpp)
-
-if (WIN32)
-    target_compile_definitions(boost_process_v2_test_impl PUBLIC WIN32_LEAN_AND_MEAN=1)
-    target_link_libraries(boost_process_v2_test_impl Boost::process Boost::unit_test_framework Boost::process Ntdll)
-else()
-    target_link_libraries(boost_process_v2_test_impl Boost::process Boost::unit_test_framework Boost::process)
-endif()
-
 function(boost_process_v2_standalone_test name)
-    add_executable(boost_process_v2_${name} ${name}.cpp)
-    target_link_libraries(boost_process_v2_${name} Boost::process Boost::system Boost::filesystem boost_process_v2_test_impl)
+    add_executable(boost_process_v2_${name} ${name}.cpp test_impl.cpp)
+    target_link_libraries(boost_process_v2_${name} Boost::process Boost::system Boost::filesystem Boost::unit_test_framework )
+    if (WIN32)
+        target_compile_definitions(boost_process_v2_${name} PUBLIC WIN32_LEAN_AND_MEAN=1)
+        target_link_libraries(boost_process_v2_${name} PUBLIC Ntdll)
+    endif()
     add_test(NAME boost_process_v2_${name} COMMAND $<TARGET_FILE:boost_process_v2_${name}> )
 endfunction()
 
